@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000;
+  --foreground: #fff;
+  --dim: #6a6a6a;
+  --accent: #4aa3ff;
+  --ok: #a6ff5a;
+  --err: #ff7676;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
