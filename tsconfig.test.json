@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "incremental": false,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": ".test-dist",
+    "rootDir": ".",
+    "jsx": "preserve",
+    "types": ["node"],
+    "paths": { "@/*": ["./*"] }
+  },
+  "include": ["lib/concrete/**/*.ts", "test/**/*.ts"]
+}
