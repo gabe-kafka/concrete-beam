@@ -3,7 +3,8 @@
 // Tiny set of cockpit-flat input primitives so the page file isn't
 // drowning in className soup.
 
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, FocusEvent, KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
 
 interface NumberFieldProps {
   label: string;
@@ -11,17 +12,37 @@ interface NumberFieldProps {
   value: number;
   onChange: (v: number) => void;
   step?: number;
-  min?: number;
   width?: string;
 }
 
 const inputCls =
   "w-full bg-transparent border px-2 py-1 text-sm focus:outline-none";
 
-export function NumberField({ label, units, value, onChange, step = 0.5, min = 0, width }: NumberFieldProps) {
+export function NumberField({ label, units, value, onChange, step = 0.5, width }: NumberFieldProps) {
+  const [draft, setDraft] = useState(() => (Number.isFinite(value) ? String(value) : ""));
+
+  useEffect(() => {
+    setDraft(Number.isFinite(value) ? String(value) : "");
+  }, [value]);
+
   const handle = (e: ChangeEvent<HTMLInputElement>) => {
-    const v = parseFloat(e.target.value);
-    if (Number.isFinite(v)) onChange(v);
+    setDraft(e.target.value);
+  };
+  const commit = () => {
+    const v = parseFloat(draft);
+    if (Number.isFinite(v)) {
+      onChange(v);
+    } else {
+      setDraft(Number.isFinite(value) ? String(value) : "");
+    }
+  };
+  const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.select();
+  };
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
   };
   return (
     <label className="block text-xs" style={{ color: "var(--dim)" }}>
@@ -31,10 +52,12 @@ export function NumberField({ label, units, value, onChange, step = 0.5, min = 0
       </div>
       <input
         type="number"
-        value={Number.isFinite(value) ? value : ""}
+        value={draft}
         onChange={handle}
+        onFocus={handleFocus}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
         step={step}
-        min={min}
         className={inputCls}
         style={{ borderColor: "var(--rule)", color: "var(--foreground)", width }}
       />
@@ -49,14 +72,13 @@ interface IntFieldProps {
   min?: number;
 }
 
-export function IntField({ label, value, onChange, min = 0 }: IntFieldProps) {
+export function IntField({ label, value, onChange }: IntFieldProps) {
   return (
     <NumberField
       label={label}
       value={value}
-      onChange={(v) => onChange(Math.max(min, Math.round(v)))}
+      onChange={(v) => onChange(Math.round(v))}
       step={1}
-      min={min}
     />
   );
 }

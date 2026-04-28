@@ -43,6 +43,72 @@ function expandLayers(side: "top" | "bottom", c: FaceConfig): RebarLayer[] {
   }));
 }
 
+function validateInputs({
+  b,
+  h,
+  fc,
+  fy,
+  topCover,
+  bottomCover,
+  sideCover,
+  bot,
+  top,
+  stirrupLegs,
+  stirrupSpacing,
+  layers,
+}: {
+  b: number;
+  h: number;
+  fc: number;
+  fy: number;
+  topCover: number;
+  bottomCover: number;
+  sideCover: number;
+  bot: FaceConfig;
+  top: FaceConfig;
+  stirrupLegs: number;
+  stirrupSpacing: number;
+  layers: RebarLayer[];
+}): string[] {
+  const errors: string[] = [];
+
+  if (!(b > 0)) errors.push("Section width b must be greater than 0 in.");
+  if (!(h > 0)) errors.push("Section height h must be greater than 0 in.");
+  if (!(fc > 0)) errors.push("Concrete strength f'c must be greater than 0 ksi.");
+  if (!(fy > 0)) errors.push("Steel yield strength fy must be greater than 0 ksi.");
+  if (bottomCover < 0 || topCover < 0 || sideCover < 0) {
+    errors.push("Clear cover values cannot be negative.");
+  }
+  if (b > 0 && sideCover >= b / 2) {
+    errors.push("Side cover leaves no horizontal space for reinforcement.");
+  }
+
+  const faceChecks = [
+    ["Bottom", bot] as const,
+    ["Top", top] as const,
+  ];
+  for (const [label, face] of faceChecks) {
+    if (face.num_bars < 0) errors.push(`${label} bars per layer cannot be negative.`);
+    if (face.multi_layers && face.num_layers < 1) errors.push(`${label} layer count must be at least 1.`);
+    if (face.multi_layers && face.spacing <= 0) errors.push(`${label} layer spacing must be greater than 0 in.`);
+    if (face.start_dist < 0) errors.push(`${label} first bar distance cannot be negative.`);
+  }
+
+  if (stirrupLegs < 2) errors.push("Stirrups must have at least 2 legs.");
+  if (stirrupSpacing <= 0) errors.push("Stirrup spacing must be greater than 0 in.");
+
+  if (h > 0) {
+    for (const layer of layers) {
+      const y = layer.side === "bottom" ? layer.dist : h - layer.dist;
+      if (y < 0 || y > h) {
+        errors.push(`${layer.side === "bottom" ? "Bottom" : "Top"} layer at ${layer.dist} in is outside the section height.`);
+      }
+    }
+  }
+
+  return errors;
+}
+
 export default function Home() {
   // Section
   const [b, setB] = useState(36);
@@ -94,7 +160,35 @@ export default function Home() {
        stirrupSize, stirrupLegs, stirrupSpacing,
        muPos, muNeg, vu, maPos, maNeg]);
 
-  const result = useMemo(() => analyze(analyzeInput), [analyzeInput]);
+  const inputErrors = useMemo(
+    () => validateInputs({
+      b,
+      h,
+      fc,
+      fy,
+      topCover,
+      bottomCover,
+      sideCover,
+      bot,
+      top,
+      stirrupLegs,
+      stirrupSpacing,
+      layers,
+    }),
+    [b, h, fc, fy, topCover, bottomCover, sideCover, bot, top, stirrupLegs, stirrupSpacing, layers],
+  );
+
+  const analysis = useMemo(() => {
+    if (inputErrors.length > 0) return { result: null, error: null };
+    try {
+      return { result: analyze(analyzeInput), error: null };
+    } catch (error) {
+      return {
+        result: null,
+        error: error instanceof Error ? error.message : "Analysis failed for the current input.",
+      };
+    }
+  }, [analyzeInput, inputErrors]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -188,11 +282,36 @@ export default function Home() {
 
         {/* Visualization + results */}
         <main className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: "calc(100vh - 33px)" }}>
-          <BeamSvg b={b} h={h} layers={layers} sideCover={sideCover} />
-          <ResultsPanel result={result} />
+          {inputErrors.length > 0 || analysis.error ? (
+            <InputErrorPanel errors={analysis.error ? [...inputErrors, analysis.error] : inputErrors} />
+          ) : (
+            <>
+              <BeamSvg b={b} h={h} layers={layers} sideCover={sideCover} />
+              {analysis.result && <ResultsPanel result={analysis.result} />}
+            </>
+          )}
           <ApiPreview body={analyzeInput} />
         </main>
       </div>
+    </div>
+  );
+}
+
+function InputErrorPanel({ errors }: { errors: string[] }) {
+  return (
+    <div
+      className="border p-4 text-sm"
+      style={{ borderColor: "var(--err)", background: "var(--panel)" }}
+      role="alert"
+    >
+      <h2 className="text-xs uppercase tracking-wider mb-3" style={{ color: "var(--err)" }}>
+        Input error
+      </h2>
+      <ul className="space-y-1">
+        {errors.map((error, index) => (
+          <li key={`${error}-${index}`}>{error}</li>
+        ))}
+      </ul>
     </div>
   );
 }
